@@ -21,4 +21,4 @@ public class DemocyberApplication {
         return "Hello from Democyber 123 2026!";
     }
 
-}
+}   
