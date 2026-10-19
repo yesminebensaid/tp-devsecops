@@ -29,3 +29,12 @@ jobs:
       # Build Maven (compile + package)
       - name: Build Java project with Maven
         run: mvn -B clean package
+      
+      # Gitleaks scan (before compilation)
+      - name: Run Gitleaks scan
+        uses: zricethezav/gitleaks-action@v2
+
+   
+
+
+
