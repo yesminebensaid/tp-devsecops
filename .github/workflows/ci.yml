@@ -22,4 +22,18 @@ jobs:
         run: |
           echo "Image name = $DOCKER_IMAGE_NAME"
           echo "Longueur = ${#DOCKER_IMAGE_NAME}"
+      
+      - name: Debug secret username
+        env:
+          USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          if [ -z "$USERNAME" ]; then
+            echo "Le secret DOCKERHUB_USERNAME est VIDE ou absent"
+          else
+            echo "Le secret existe, longueur = ${#USERNAME}"
+          fi
+
+
+
+
 
