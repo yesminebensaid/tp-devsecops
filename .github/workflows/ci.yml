@@ -57,7 +57,7 @@ jobs:
        # Test Docker image
       - name: Test Docker image locally
         run: |
-          docker run -d --name democyber-test -p 8080:8080 $DOCKER_IMAGE_NAME
+          docker run -d --name democyber-test -p 8080:8080 $DOCKER_IMAGE_NAME a
           sleep 10
           curl -f http://localhost:8080 || echo "App not responding"
           docker stop democyber-test
@@ -74,3 +74,9 @@ jobs:
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
       
+      - name: Upload Trivy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.json
