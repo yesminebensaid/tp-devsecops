@@ -97,7 +97,4 @@ jobs:
       #     name: trivy-report
       #     path: trivy-report.json
 
-      # Push Docker image sur Docker Hub
-      - name: Push Docker image
-        if: github.event_name == 'push'
-        run: docker push $DOCKER_IMAGE_NAME
+      
