@@ -60,17 +60,17 @@ jobs:
           docker rm democyber-test
 
 
-      # #Tivy scan
-      # - name: Build Docker image
-      #   run: docker build -t democyber:latest .
-      # - name: Scan Docker image with Trivy
-      #   continue-on-error: true
-      #   uses: aquasecurity/trivy-action@v0.20.0
-      #   with:
-      #     image-ref: democyber:latest
-      #     format: 'table'
-      #     exit-code: '1'
-      #     severity: 'CRITICAL,HIGH'
+      #Tivy scan
+      - name: Build Docker image
+        run: docker build -t democyber:latest .
+      - name: Scan Docker image with Trivy
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          image-ref: democyber:latest
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
 
     # Push Docker image sur Docker Hub
       - name: Push Docker image
