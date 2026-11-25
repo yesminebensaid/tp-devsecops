@@ -1,3 +1,96 @@
+# name: CI/CD - democyber
+
+# on:
+#   push:
+#     branches: [ main ]
+#   pull_request:
+#     branches: [ main ]
+
+# jobs:
+#   build-and-deploy:
+#     runs-on: ubuntu-latest
+#     env:
+#       DOCKER_IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/democyber:latest
+
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+#         with:
+#           fetch-depth: 0
+
+#       # Gitleaks scan (before compilation)
+#       - name: Run Gitleaks scan
+#         uses: zricethezav/gitleaks-action@v2
+#         env:
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+#       # Upload the Gitleaks report
+#       - name: Upload Gitleaks report
+#         if: always()
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: gitleaks-report
+#           path: results.sarif
+
+#       - name: Set up JDK 21
+#         uses: actions/setup-java@v4
+#         with:
+#           java-version: '21'
+#           distribution: 'temurin'
+#           cache: maven
+
+#       - name: Build Java project with Maven
+#         run: mvn -B clean package
+
+#       - name: Login to Docker Hub
+#         uses: docker/login-action@v2
+#         with:
+#           username: ${{ secrets.DOCKERHUB_USERNAME }}
+#           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+#       - name: Build Docker image
+#         run: docker build -t $DOCKER_IMAGE_NAME .
+
+#       - name: Test Docker image locally
+#         run: |
+#           docker run -d --name democyber-test -p 8080:8080 $DOCKER_IMAGE_NAME
+#           sleep 10
+#           curl -f http://localhost:8080 || echo "App not responding"
+#           docker stop democyber-test
+#           docker rm democyber-test
+
+
+#       #Tivy scan
+#       - name: Build Docker image
+#         run: docker build -t democyber:latest .
+#       - name: Scan Docker image with Trivy
+#         continue-on-error: true
+#         uses: aquasecurity/trivy-action@v0.20.0
+#         with:
+#           image-ref: democyber:latest
+#           format: 'table'
+#           exit-code: '1'
+#           severity: 'CRITICAL,HIGH'
+
+#     # Push Docker image sur Docker Hub
+#      -name: SonarCloud Scan
+#         uses: SonarSource/sonarqube-scan-action@v6
+#          env:
+#     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+#   with:
+#     args: >
+#       -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+#       -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+#       -Dsonar.java.binaries=target/classes
+
+
+
+
+
+
+
+
+
 name: CI/CD - democyber
 
 on:
@@ -9,21 +102,22 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     env:
       DOCKER_IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/democyber:latest
 
     steps:
+      # 1. Récupérer le code
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 1. Gitleaks scan (avant compilation)
+      # 2. Scanner les secrets
       - name: Run Gitleaks scan
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: zricethezav/gitleaks-action@v2
 
+      # 3. Télécharger le rapport Gitleaks
       - name: Upload Gitleaks report
         if: always()
         uses: actions/upload-artifact@v4
@@ -32,56 +126,95 @@ jobs:
           path: results.sarif
           if-no-files-found: warn
 
-      # 2. Build Java
+      # 4. Installer Java
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
-          distribution: 'temurin'
+          distribution: temurin
           cache: maven
 
+      # 5. Construire le projet Java
       - name: Build Java project with Maven
-        run: mvn -B clean package
+        run: mvn clean package
 
-      # 3. SonarCloud (après le build, car sonar.java.binaries pointe sur target/classes)
+      # 6. Analyser le code avec SonarCloud
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          args: >
-            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
-            -Dsonar.java.binaries=target/classes
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+          -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+          -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
 
-      # 4. Docker
+      # 7. Construire l'image Docker
+      - name: Build Docker image
+        run: docker build --pull --no-cache -t democyber:latest .
+      # 8. Tester l'image localement
+      - name: Test Docker image locally
+        run: |
+          set -e
+          docker run -d --name democyber-test -p 8080:8080 democyber:latest
+          trap 'docker rm -f democyber-test >/dev/null 2>&1 || true' EXIT
+          sleep 10
+          curl --retry 5 --retry-delay 2 --retry-connrefused -f http://localhost:8080/
+
+      # 9. Scanner l'image avec Trivy
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          image-ref: democyber:latest
+          format: table
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+      # 10. Générer le rapport Trivy au format SARIF
+      - name: Generate Trivy SARIF report
+        if: always()
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          image-ref: democyber:latest
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      # 11. Télécharger le rapport Trivy
+      - name: Upload Trivy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-results.sarif
+          if-no-files-found: warn
+
+      # 12. Vérifier le nom de l'image Docker Hub
+      - name: Verify Docker image name
+        if: github.event_name == 'push'
+        run: |
+          if [ -z "$DOCKER_IMAGE_NAME" ] || [[ "$DOCKER_IMAGE_NAME" == "/democyber:latest" ]]; then
+            echo "Docker Hub image name is not configured"
+            exit 1
+          fi
+          echo "Docker image name is configured."
+
+      # 13. Se connecter à Docker Hub
       - name: Login to Docker Hub
+        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Docker image
-        run: docker build -t $DOCKER_IMAGE_NAME .
+      # 14. Préparer le tag Docker Hub
+      - name: Tag Docker image for Docker Hub
+        if: github.event_name == 'push'
+        run: docker tag democyber:latest "$DOCKER_IMAGE_NAME"
 
-      - name: Test Docker image locally
-        run: |
-          docker run -d --name democyber-test -p 8080:8080 $DOCKER_IMAGE_NAME
-          sleep 10
-          curl -f http://localhost:8080 || echo "App not responding"
-          docker stop democyber-test
-          docker rm democyber-test
-
-      # 5. Trivy
-      - name: Scan Docker image with Trivy
-        continue-on-error: true
-        uses: aquasecurity/trivy-action@v0.20.0
-        with:
-          image-ref: ${{ env.DOCKER_IMAGE_NAME }}
-          format: 'table'
-          exit-code: '1'
-          severity: 'CRITICAL,HIGH'
-
-      # 6. Push sur Docker Hub
+      # 15. Publier l'image
       - name: Push Docker image
-        run: docker push $DOCKER_IMAGE_NAME
+        if: github.event_name == 'push'
+        run: docker push "$DOCKER_IMAGE_NAME"
