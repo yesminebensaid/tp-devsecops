@@ -79,15 +79,27 @@ jobs:
       #   run: docker push $DOCKER_IMAGE_NAME
        
        
-    # Run SonarCloud scan
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+    # # Run SonarCloud scan
+    #   - name: SonarCloud Scan
+    #     uses: SonarSource/sonarcloud-github-action@master
+    #     with:
+    #       projectBaseDir: .
+    #       args: >
+    #         -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+    #         -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+    #         -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+      # Run SonarQube Cloud scan
+      - name: SonarQube Cloud Scan
+        uses: SonarSource/sonarqube-scan-action@v5.0.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           projectBaseDir: .
           args: >
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
 
 
       # - name: Test SonarQube authentication
